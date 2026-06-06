@@ -32,11 +32,15 @@ def _left_of(p, e):
     return ccw(p, e.org, e.dest)
 
 
-def _build(S):
+def _build(S, recorder=None, depth=0):
     """Рекурсивно побудувати тріангуляцію відсортованого зрізу S.
 
     Повертає пару (ldo, rdo): крайнє ліве (вихідне з найлівішої точки)
     та крайнє праве ребра опуклої оболонки фрагмента.
+
+    Необов'язковий ``recorder`` фіксує розділяючий ланцюг Вороного кожного
+    злиття (для демонстрації/анімації). За ``recorder is None`` накладні
+    витрати нульові — поведінка побудови не змінюється.
     """
     n = len(S)
 
@@ -59,8 +63,8 @@ def _build(S):
 
     # --- Етап 1: поділ по медіані X ---
     m = n // 2
-    ldo, ldi = _build(S[:m])
-    rdi, rdo = _build(S[m:])
+    ldo, ldi = _build(S[:m], recorder, depth + 1)
+    rdi, rdo = _build(S[m:], recorder, depth + 1)
 
     # --- Етап 2: пошук нижньої спільної дотичної ---
     while True:
@@ -71,12 +75,19 @@ def _build(S):
         else:
             break
 
-    # перше зшиваюче ребро (нижній опорний відрізок)
+    # перше зшиваюче ребро (нижній опорний відрізок) = σ_out ланцюга
     basel = connect(rdi.sym, ldi)
     if ldi.org is ldo.org:
         ldo = basel.sym
     if rdi.org is rdo.org:
         rdo = basel
+    if recorder:
+        med_x = (S[m - 1].x + S[m].x) / 2.0   # вертикальна лінія медіани поділу
+        ylo = min(p.y for p in S)
+        yhi = max(p.y for p in S)
+        chain = recorder.start_merge(depth, basel, med_x, ylo, yhi)
+    else:
+        chain = None
 
     # --- зигзагоподібне зшивання знизу вгору ---
     while True:
@@ -105,6 +116,9 @@ def _build(S):
             basel = connect(rcand, basel.sym)
         else:
             basel = connect(basel.sym, lcand.sym)
+        # нове перехресне ребро = чергова ланка розділяючого ланцюга Вороного
+        if recorder:
+            recorder.cross(chain, basel)
 
     return ldo, rdo
 
